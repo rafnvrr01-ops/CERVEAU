@@ -2,7 +2,7 @@
 import { CONFIG } from './world.js';
 import { createGameState, update, tryBuild, tryResearch } from './game.js';
 import { initRenderer, drawTerrain, drawNightOverlay, drawWeather, drawSnow, drawMinimap, drawGhost, clearCanvas } from './render.js';
-import { drawColon, drawAnimal, drawBandit, drawBuilding } from './render-sprites.js';
+import { drawColon, drawAnimal, drawBandit, drawBuilding, drawTree, drawRock } from './render-sprites.js';
 import { initUI, updateUI, setSelectedAction } from './ui.js';
 
 const canvas = document.getElementById('canvas');
@@ -23,15 +23,17 @@ initUI(state, {
 // Bug 6: mousemove updates world coords for ghost
 canvas.addEventListener('mousemove', (e) => {
   const r = canvas.getBoundingClientRect();
-  state.mouseWorldX = (e.clientX - r.left) + state.camera.x;
-  state.mouseWorldY = (e.clientY - r.top) + state.camera.y;
+  const sx = canvas.width / r.width, sy = canvas.height / r.height;
+  state.mouseWorldX = (e.clientX - r.left) * sx + state.camera.x;
+  state.mouseWorldY = (e.clientY - r.top) * sy + state.camera.y;
 });
 
 // Bug 1: click handler with build short-circuit FIRST
 canvas.addEventListener('click', (e) => {
   const r = canvas.getBoundingClientRect();
-  const wx = (e.clientX - r.left) + state.camera.x;
-  const wy = (e.clientY - r.top) + state.camera.y;
+  const sx = canvas.width / r.width, sy = canvas.height / r.height;
+  const wx = (e.clientX - r.left) * sx + state.camera.x;
+  const wy = (e.clientY - r.top) * sy + state.camera.y;
 
   // SHORT-CIRCUIT: if build mode, only handle build
   if (state.selectedAction && state.selectedAction.startsWith('build-')) {
@@ -45,10 +47,43 @@ canvas.addEventListener('click', (e) => {
   }
 
   // Otherwise: select colon under cursor or move selected colon
-  const clicked = state.colons.find(c => Math.hypot(c.x - wx, c.y - wy) < 16);
+  const clicked = state.colons.find(c => Math.hypot(c.x - wx, c.y - wy) < 20);
   if (clicked) { state.selected = clicked; return; }
-  if (state.selected && state.selectedAction === 'move') {
-    state.selected.targetX = wx; state.selected.targetY = wy; state.selected.task = 'idle';
+
+  const c = state.selected;
+  if (!c) return;
+  const act = state.selectedAction;
+
+  // Resource gathering: find nearest target of correct type
+  if (act === 'chop') {
+    const t = state.trees.reduce((best, t) => {
+      const d = Math.hypot(t.x - wx, t.y - wy);
+      return (!best || d < best.d) ? { t, d } : best;
+    }, null);
+    if (t && t.d < 80) { c.targetX = t.t.x; c.targetY = t.t.y; c.task = 'chop'; c.targetEntity = t.t; }
+  } else if (act === 'mine') {
+    const r = state.rocks.reduce((best, r) => {
+      const d = Math.hypot(r.x - wx, r.y - wy);
+      return (!best || d < best.d) ? { r, d } : best;
+    }, null);
+    if (r && r.d < 80) { c.targetX = r.r.x; c.targetY = r.r.y; c.task = 'mine'; c.targetEntity = r.r; }
+  } else if (act === 'hunt') {
+    const a = state.animals.reduce((best, a) => {
+      const d = Math.hypot(a.x - wx, a.y - wy);
+      return (!best || d < best.d) ? { a, d } : best;
+    }, null);
+    if (a && a.d < 100) { c.targetX = a.a.x; c.targetY = a.a.y; c.task = 'hunt'; c.targetEntity = a.a; }
+  } else if (act === 'tame') {
+    const a = state.animals.reduce((best, a) => {
+      if (a.hostile || a.tamed) return best;
+      const d = Math.hypot(a.x - wx, a.y - wy);
+      return (!best || d < best.d) ? { a, d } : best;
+    }, null);
+    if (a && a.d < 100) { c.targetX = a.a.x; c.targetY = a.a.y; c.task = 'tame'; c.targetEntity = a.a; }
+  } else if (act === 'fish') {
+    c.targetX = wx; c.targetY = wy; c.task = 'fish';
+  } else { // move default
+    c.targetX = wx; c.targetY = wy; c.task = 'idle';
   }
 });
 
@@ -85,6 +120,8 @@ function frame(now) {
   drawTerrain(ctx, state.camera);
   // Sort entities by Y for fake 3D
   const drawables = [];
+  for (const t of state.trees) drawables.push({ y: t.y, fn: () => drawTree(ctx, t.x - state.camera.x, t.y - state.camera.y, t.variant, state.season) });
+  for (const r of state.rocks) drawables.push({ y: r.y, fn: () => drawRock(ctx, r.x - state.camera.x, r.y - state.camera.y, r.level) });
   for (const b of state.buildings) drawables.push({ y: b.y, fn: () => drawBuilding(ctx, b, b.x - state.camera.x, b.y - state.camera.y, b.anim) });
   for (const a of state.animals) drawables.push({ y: a.y, fn: () => drawAnimal(ctx, a, a.x - state.camera.x, a.y - state.camera.y) });
   for (const b of state.bandits) drawables.push({ y: b.y, fn: () => drawBandit(ctx, b, b.x - state.camera.x, b.y - state.camera.y) });

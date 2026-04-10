@@ -55,6 +55,19 @@ export function createGameState(seed) {
     const a = spawnAnimal(world, ['cow','deer','wolf'][i%3], colon.x, colon.y);
     if (a) state.animals.push(a);
   }
+  // Resource nodes: trees and rocks
+  state.trees = []; state.rocks = [];
+  for (let i = 0; i < 300; i++) {
+    const x = Math.random() * CONFIG.WORLD_W, y = Math.random() * CONFIG.WORLD_H;
+    if (canWalk(world, x, y)) {
+      const v = ['feuillu','pin','feuillu'][i%3];
+      state.trees.push({ x, y, variant: v, hp: 30 });
+    }
+  }
+  for (let i = 0; i < 150; i++) {
+    const x = Math.random() * CONFIG.WORLD_W, y = Math.random() * CONFIG.WORLD_H;
+    if (canWalk(world, x, y)) state.rocks.push({ x, y, level: Math.floor(Math.random()*5), hp: 40 });
+  }
   return state;
 }
 
@@ -79,13 +92,39 @@ export function update(state, rawDt) {
   // Update entities
   for (const c of state.colons) {
     c.update(dt, state.world);
-    // Build task arrival
-    if (c.task === 'build' && Math.hypot(c.targetX - c.x, c.targetY - c.y) < 5) {
+    const arrived = Math.hypot(c.targetX - c.x, c.targetY - c.y) < 5;
+    if (c.task === 'build' && arrived) {
       const def = BUILDINGS[c.buildType];
       if (def) state.buildings.push(new Building(c.targetX, c.targetY, c.buildType, def));
       c.task = 'idle'; c.buildType = null;
+    } else if (c.task === 'chop' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
+      c.targetEntity.hp -= dt * 15;
+      if (c.targetEntity.hp <= 0) {
+        state.resources.wood += 5;
+        state.trees = state.trees.filter(t => t !== c.targetEntity);
+        c.task = 'idle'; c.targetEntity = null;
+      }
+    } else if (c.task === 'mine' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
+      c.targetEntity.hp -= dt * 12;
+      if (c.targetEntity.hp <= 0) {
+        state.resources.stone += 4;
+        if (c.targetEntity.level >= 3) state.resources.iron += 2;
+        state.rocks = state.rocks.filter(r => r !== c.targetEntity);
+        c.task = 'idle'; c.targetEntity = null;
+      }
+    } else if (c.task === 'hunt' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
+      c.targetEntity.hp -= dt * 20;
+      if (c.targetEntity.hp <= 0) {
+        state.resources.food += 6;
+        state.animals = state.animals.filter(a => a !== c.targetEntity);
+        c.task = 'idle'; c.targetEntity = null;
+      }
+    } else if (c.task === 'tame' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
+      c.targetEntity.tame = (c.targetEntity.tame || 0) + dt * 20;
+      if (c.targetEntity.tame >= 100) { c.targetEntity.tamed = true; c.task = 'idle'; c.targetEntity = null; }
+    } else if (c.task === 'fish' && arrived) {
+      state.resources.food += 2; c.task = 'idle';
     }
-    // Warmth from season
     if (state.season === 'Hiver') c.warmth = Math.max(0, c.warmth - dt * 0.4);
     else c.warmth = Math.min(100, c.warmth + dt * 0.2);
   }
