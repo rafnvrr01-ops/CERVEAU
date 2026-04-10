@@ -20,10 +20,11 @@
   --border-radius-lg: 8px;
 }
 body {
-  margin: 0; padding: 8px;
+  margin: 0; padding: 4px;
   font-family: var(--font-sans);
   color: var(--color-text-primary);
-  background: #fafafa;
+  background: #1a1a1a;
+  overflow: hidden;
 }
 canvas { display: block; image-rendering: pixelated; }
 button { font-family: inherit; }

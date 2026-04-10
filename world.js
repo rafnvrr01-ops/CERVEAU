@@ -1,9 +1,17 @@
 // world.js - Génération procédurale du monde
 export const CONFIG = {
-  TILE: 40, MAP_W: 180, MAP_H: 135,
+  TILE: 60, MAP_W: 120, MAP_H: 90,
   WORLD_W: 7200, WORLD_H: 5400,
-  CANVAS_W: 680, CANVAS_H: 480,
+  CANVAS_W: typeof window !== 'undefined' ? window.innerWidth : 1280,
+  CANVAS_H: typeof window !== 'undefined' ? window.innerHeight - 120 : 720,
 };
+
+export function updateCanvasSize() {
+  if (typeof window !== 'undefined') {
+    CONFIG.CANVAS_W = window.innerWidth;
+    CONFIG.CANVAS_H = window.innerHeight - 120;
+  }
+}
 
 export const BIOMES = {
   WATER:    { id: 0, name: 'eau',            walkable: false, color: '#2a5a8a' },

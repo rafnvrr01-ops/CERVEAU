@@ -1,5 +1,5 @@
 // main.js - Entry point
-import { CONFIG } from './world.js';
+import { CONFIG, updateCanvasSize } from './world.js';
 import { createGameState, update, tryBuild, tryResearch } from './game.js';
 import { initRenderer, drawTerrain, drawNightOverlay, drawWeather, drawSnow, drawMinimap, drawGhost, clearCanvas } from './render.js';
 import { drawColon, drawAnimal, drawBandit, drawBuilding, drawTree, drawRock } from './render-sprites.js';
@@ -9,6 +9,14 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const minimap = document.getElementById('minimap');
 const mctx = minimap.getContext('2d');
+
+function resizeCanvas() {
+  updateCanvasSize();
+  canvas.width = CONFIG.CANVAS_W;
+  canvas.height = CONFIG.CANVAS_H;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
 
 const state = createGameState();
 initRenderer(state.world);
