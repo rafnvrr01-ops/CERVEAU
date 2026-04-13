@@ -64,25 +64,25 @@ canvas.addEventListener('click', (e) => {
 
   // Resource gathering: find nearest target of correct type
   if (act === 'chop') {
-    const t = state.trees.reduce((best, t) => {
+    const t = (state._nearTrees||[]).reduce((best, t) => {
       const d = Math.hypot(t.x - wx, t.y - wy);
       return (!best || d < best.d) ? { t, d } : best;
     }, null);
     if (t && t.d < 80) { c.targetX = t.t.x; c.targetY = t.t.y; c.task = 'chop'; c.targetEntity = t.t; }
   } else if (act === 'mine') {
-    const r = state.rocks.reduce((best, r) => {
+    const r = (state._nearRocks||[]).reduce((best, r) => {
       const d = Math.hypot(r.x - wx, r.y - wy);
       return (!best || d < best.d) ? { r, d } : best;
     }, null);
     if (r && r.d < 80) { c.targetX = r.r.x; c.targetY = r.r.y; c.task = 'mine'; c.targetEntity = r.r; }
   } else if (act === 'hunt') {
-    const a = state.animals.reduce((best, a) => {
+    const a = (state._nearAnimals||[]).reduce((best, a) => {
       const d = Math.hypot(a.x - wx, a.y - wy);
       return (!best || d < best.d) ? { a, d } : best;
     }, null);
     if (a && a.d < 100) { c.targetX = a.a.x; c.targetY = a.a.y; c.task = 'hunt'; c.targetEntity = a.a; }
   } else if (act === 'tame') {
-    const a = state.animals.reduce((best, a) => {
+    const a = (state._nearAnimals||[]).reduce((best, a) => {
       if (a.hostile || a.tamed) return best;
       const d = Math.hypot(a.x - wx, a.y - wy);
       return (!best || d < best.d) ? { a, d } : best;
@@ -128,8 +128,12 @@ function frame(now) {
   drawTerrain(ctx, state.camera);
   // Sort entities by Y for fake 3D
   const drawables = [];
-  for (const t of state.trees) drawables.push({ y: t.y, fn: () => drawTree(ctx, t.x - state.camera.x, t.y - state.camera.y, t.variant, state.season) });
-  for (const r of state.rocks) drawables.push({ y: r.y, fn: () => drawRock(ctx, r.x - state.camera.x, r.y - state.camera.y, r.level) });
+  const trees = state._nearTrees || [];
+  const rocks = state._nearRocks || [];
+  const animals = state._nearAnimals || [];
+  for (const t of trees) drawables.push({ y: t.y, fn: () => drawTree(ctx, t.x - state.camera.x, t.y - state.camera.y, t.variant, state.season) });
+  for (const r of rocks) drawables.push({ y: r.y, fn: () => drawRock(ctx, r.x - state.camera.x, r.y - state.camera.y, r.level) });
+  for (const a of animals) drawables.push({ y: a.y, fn: () => drawAnimal(ctx, a, a.x - state.camera.x, a.y - state.camera.y) });
   for (const b of state.buildings) drawables.push({ y: b.y, fn: () => drawBuilding(ctx, b, b.x - state.camera.x, b.y - state.camera.y, b.anim) });
   for (const a of state.animals) drawables.push({ y: a.y, fn: () => drawAnimal(ctx, a, a.x - state.camera.x, a.y - state.camera.y) });
   for (const b of state.bandits) drawables.push({ y: b.y, fn: () => drawBandit(ctx, b, b.x - state.camera.x, b.y - state.camera.y) });

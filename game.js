@@ -1,5 +1,5 @@
 // game.js - État, boucle, saisons, météo, spawns, score
-import { CONFIG, generateWorld, canWalk } from './world.js';
+import { CONFIG, createWorld, canWalk, generateChunkEntities } from './world.js';
 import { Village, Building, BUILDINGS, TECHS, spawnColon, spawnAnimal, spawnBandit, tryBirth } from './entities.js';
 
 const SEASONS = ['Printemps','Été','Automne','Hiver'];
@@ -8,8 +8,72 @@ const WEATHERS = ['Clair','Clair','Clair','Pluie','Tempête'];
 const VILLAGE_COLORS = ['#e04040','#40c0e0','#c040e0','#e0c040','#40e080','#e08040'];
 const VILLAGE_NAMES = ['Ferrac','Bornholm','Vael','Oxia','Drakk','Sylvane'];
 
+const chunkCache = new Map(); // "cx,cy" -> { trees, rocks, animals }
+
+function getChunk(world, cx, cy) {
+  const k = cx + ',' + cy;
+  if (!chunkCache.has(k)) chunkCache.set(k, generateChunkEntities(world, cx, cy));
+  return chunkCache.get(k);
+}
+
+export function collectNearbyEntities(state) {
+  // Returns flat arrays of trees/rocks/animals from chunks around the camera
+  const cx0 = Math.floor(state.camera.x / (CONFIG.CHUNK * CONFIG.TILE)) - 1;
+  const cy0 = Math.floor(state.camera.y / (CONFIG.CHUNK * CONFIG.TILE)) - 1;
+  const cw = Math.ceil(CONFIG.CANVAS_W / (CONFIG.CHUNK * CONFIG.TILE)) + 3;
+  const ch = Math.ceil(CONFIG.CANVAS_H / (CONFIG.CHUNK * CONFIG.TILE)) + 3;
+  const trees = [], rocks = [], animals = [];
+  for (let cy = cy0; cy < cy0 + ch; cy++) {
+    for (let cx = cx0; cx < cx0 + cw; cx++) {
+      if (cx < 0 || cy < 0) continue;
+      const c = getChunk(state.world, cx, cy);
+      for (const t of c.trees) if (!state.destroyed.has(t.id)) trees.push(t);
+      for (const r of c.rocks) if (!state.destroyed.has(r.id)) rocks.push(r);
+      for (const a of c.animals) if (!state.destroyed.has(a.id)) animals.push(a);
+    }
+  }
+  return { trees, rocks, animals };
+}
+
 export function createGameState(seed) {
-  const world = generateWorld(seed);
+  const world = createWorld(seed);
+  const colon = spawnColon(world, 'Aldred');
+  const state = {
+    world,
+    colons: [colon],
+    bandits: [],
+    villages: [],
+    buildings: [],
+    destroyed: new Set(),
+    resources: { wood: 0, stone: 0, iron: 0, gold: 5, food: 10, water: 8, herbs: 2, seeds: 3 },
+    techs: {},
+    day: 1,
+    timeOfDay: 0.25,
+    season: 'Printemps',
+    seasonDay: 0,
+    weather: 'Clair',
+    weatherCd: 30,
+    speed: 1,
+    paused: false,
+    selected: colon,
+    selectedAction: 'move',
+    selectedBuildType: null,
+    camera: { x: colon.x - CONFIG.CANVAS_W/2, y: colon.y - CONFIG.CANVAS_H/2 },
+    mouseWorldX: 0, mouseWorldY: 0,
+    score: 0,
+    spawnCd: 5,
+    objectives: {},
+  };
+  // Spawn 6 villages near center
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const r = 1500 + Math.random() * 1000;
+    const x = colon.x + Math.cos(angle) * r;
+    const y = colon.y + Math.sin(angle) * r;
+    state.villages.push(new Village(x, y, VILLAGE_NAMES[i], VILLAGE_COLORS[i]));
+  }
+  return state;
+}
   const colon = spawnColon(world, 'Aldred');
   const state = {
     world,
@@ -40,35 +104,6 @@ export function createGameState(seed) {
       gold100: false, allTechs: false, age20: false,
     },
   };
-  // Spawn 6 villages
-  for (let i = 0; i < 6; i++) {
-    let v = null;
-    for (let t = 0; t < 100; t++) {
-      const x = Math.random() * CONFIG.WORLD_W;
-      const y = Math.random() * CONFIG.WORLD_H;
-      if (canWalk(world, x, y)) { v = new Village(x, y, VILLAGE_NAMES[i], VILLAGE_COLORS[i]); break; }
-    }
-    if (v) state.villages.push(v);
-  }
-  // Initial wildlife
-  for (let i = 0; i < 8; i++) {
-    const a = spawnAnimal(world, ['cow','deer','wolf'][i%3], colon.x, colon.y);
-    if (a) state.animals.push(a);
-  }
-  // Resource nodes: trees and rocks
-  state.trees = []; state.rocks = [];
-  for (let i = 0; i < 300; i++) {
-    const x = Math.random() * CONFIG.WORLD_W, y = Math.random() * CONFIG.WORLD_H;
-    if (canWalk(world, x, y)) {
-      const v = ['feuillu','pin','feuillu'][i%3];
-      state.trees.push({ x, y, variant: v, hp: 30 });
-    }
-  }
-  for (let i = 0; i < 150; i++) {
-    const x = Math.random() * CONFIG.WORLD_W, y = Math.random() * CONFIG.WORLD_H;
-    if (canWalk(world, x, y)) state.rocks.push({ x, y, level: Math.floor(Math.random()*5), hp: 40 });
-  }
-  return state;
 }
 
 export function update(state, rawDt) {
@@ -90,6 +125,10 @@ export function update(state, rawDt) {
     state.camera.y = Math.max(0, Math.min(CONFIG.WORLD_H - CONFIG.CANVAS_H, state.camera.y));
   }
   // Update entities
+  const _near = collectNearbyEntities(state);
+  state._nearAnimals = _near.animals;
+  state._nearTrees = _near.trees;
+  state._nearRocks = _near.rocks;
   for (const c of state.colons) {
     c.update(dt, state.world);
     const arrived = Math.hypot(c.targetX - c.x, c.targetY - c.y) < 5;
@@ -101,7 +140,7 @@ export function update(state, rawDt) {
       c.targetEntity.hp -= dt * 15;
       if (c.targetEntity.hp <= 0) {
         state.resources.wood += 5;
-        state.trees = state.trees.filter(t => t !== c.targetEntity);
+        state.destroyed.add(c.targetEntity.id);
         c.task = 'idle'; c.targetEntity = null;
       }
     } else if (c.task === 'mine' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
@@ -109,14 +148,14 @@ export function update(state, rawDt) {
       if (c.targetEntity.hp <= 0) {
         state.resources.stone += 4;
         if (c.targetEntity.level >= 3) state.resources.iron += 2;
-        state.rocks = state.rocks.filter(r => r !== c.targetEntity);
+        state.destroyed.add(c.targetEntity.id);
         c.task = 'idle'; c.targetEntity = null;
       }
     } else if (c.task === 'hunt' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
       c.targetEntity.hp -= dt * 20;
       if (c.targetEntity.hp <= 0) {
         state.resources.food += 6;
-        state.animals = state.animals.filter(a => a !== c.targetEntity);
+        state.destroyed.add(c.targetEntity.id);
         c.task = 'idle'; c.targetEntity = null;
       }
     } else if (c.task === 'tame' && c.targetEntity && Math.hypot(c.targetEntity.x - c.x, c.targetEntity.y - c.y) < 25) {
@@ -129,7 +168,7 @@ export function update(state, rawDt) {
     else c.warmth = Math.min(100, c.warmth + dt * 0.2);
   }
   state.colons = state.colons.filter(c => c.hp > 0);
-  for (const a of state.animals) a.update(dt, state.world);
+  for (const a of state._nearAnimals) a.update(dt, state.world);
   for (const b of state.bandits) {
     const target = state.colons[0];
     b.update(dt, state.world, target);
@@ -142,7 +181,7 @@ export function update(state, rawDt) {
   for (const b of state.buildings) b.anim += dt;
   // Watchtower auto-fire
   for (const tower of state.buildings.filter(b => b.type === 'watchtower')) {
-    for (const enemy of state.bandits.concat(state.animals.filter(a => a.hostile))) {
+    for (const enemy of state.bandits.concat(state._nearAnimals.filter(a => a.hostile))) {
       if (Math.hypot(tower.x - enemy.x, tower.y - enemy.y) < 150) {
         enemy.hp -= dt * 8; break;
       }
@@ -165,7 +204,7 @@ export function update(state, rawDt) {
         const n = 1 + Math.floor(state.day / 4);
         for (let i = 0; i < n; i++) {
           const w = spawnAnimal(state.world, 'wolf-black', target.x, target.y);
-          if (w) state.animals.push(w);
+          // wolves now spawn via chunks; bandits handle direct spawn;
         }
       }
       if (!isNight && state.day >= 6) {
@@ -201,7 +240,7 @@ function onNewDay(state) {
     else { c.age++; if (c.age >= 10) c.isChild = false; }
   }
   // Cow milk -> food
-  const cows = state.animals.filter(a => a.tamed && a.species === 'cow').length;
+  const cows = (state._nearAnimals||[]).filter(a => a.tamed && a.species === 'cow').length;
   state.resources.food += cows;
   // Farms produce food
   state.resources.food += state.buildings.filter(b => b.type === 'farm').length * 2;

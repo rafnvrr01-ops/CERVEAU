@@ -10,58 +10,59 @@ function outline(ctx, fn, color = '#1a1a1a', width = 1.5) {
 }
 
 export function drawColon(ctx, c, sx, sy, selected) {
-  const s = c.isChild ? 0.72 : 1;
-  const ph = Math.sin(c.walkPhase) * 3 * s;
-  shadow(ctx, sx, sy + 18*s, 12*s, 4*s);
-  // Jambes avec contour
-  ctx.fillStyle = '#2a2a4a';
-  ctx.fillRect(sx - 6*s, sy + 6*s + ph, 4*s, 12*s);
-  ctx.fillRect(sx + 2*s, sy + 6*s - ph, 4*s, 12*s);
-  ctx.strokeStyle = '#000'; ctx.lineWidth = 1;
-  ctx.strokeRect(sx - 6*s, sy + 6*s + ph, 4*s, 12*s);
-  ctx.strokeRect(sx + 2*s, sy + 6*s - ph, 4*s, 12*s);
-  // Bottes
-  ctx.fillStyle = '#3a2010';
-  ctx.fillRect(sx - 7*s, sy + 16*s + ph, 6*s, 3*s);
-  ctx.fillRect(sx + 1*s, sy + 16*s - ph, 6*s, 3*s);
-  // Corps tunique avec dégradé
-  const grd = ctx.createLinearGradient(sx - 8*s, sy, sx + 8*s, sy);
-  grd.addColorStop(0, c.isChild ? '#6a9a3a' : '#4a7a2a');
-  grd.addColorStop(0.5, c.isChild ? '#8aba5a' : '#6a9a4a');
-  grd.addColorStop(1, c.isChild ? '#5a8a2a' : '#3a6a1a');
-  ctx.fillStyle = grd;
-  ctx.fillRect(sx - 8*s, sy - 6*s, 16*s, 14*s);
-  ctx.strokeStyle = '#1a3a0a'; ctx.lineWidth = 1;
-  ctx.strokeRect(sx - 8*s, sy - 6*s, 16*s, 14*s);
-  // Ceinture
-  ctx.fillStyle = '#5a3010'; ctx.fillRect(sx - 8*s, sy + 4*s, 16*s, 2*s);
+  const moving = Math.abs(c.targetX - c.x) > 2 || Math.abs(c.targetY - c.y) > 2;
+  if (moving) c.walkPhase += 0.22;
+  const legOffset = Math.sin(c.walkPhase) * 2;
+  const scale = c.isChild ? 0.7 : 1;
+  // Ombre
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.beginPath(); ctx.ellipse(sx, sy + 2, 9*scale, 3*scale, 0, 0, Math.PI*2); ctx.fill();
+  // Jambes
+  ctx.fillStyle = '#2a3848';
+  ctx.fillRect(sx - 4*scale, sy - 11*scale + legOffset, 3*scale, 11*scale - legOffset);
+  ctx.fillRect(sx + 1*scale, sy - 11*scale - legOffset, 3*scale, 11*scale + legOffset);
+  // Torse
+  ctx.fillStyle = c.isChild ? '#5a8040' : '#a83020';
+  ctx.fillRect(sx - 7*scale, sy - 23*scale, 14*scale, 15*scale);
+  ctx.fillStyle = c.isChild ? '#6aa050' : '#c04030';
+  ctx.fillRect(sx - 7*scale, sy - 23*scale, 14*scale, 3*scale);
   // Bras
-  ctx.fillStyle = '#d4a574';
-  ctx.fillRect(sx - 11*s, sy - 4*s - ph*0.5, 3*s, 11*s);
-  ctx.fillRect(sx + 8*s, sy - 4*s + ph*0.5, 3*s, 11*s);
-  ctx.strokeStyle = '#000'; ctx.strokeRect(sx - 11*s, sy - 4*s - ph*0.5, 3*s, 11*s);
-  ctx.strokeRect(sx + 8*s, sy - 4*s + ph*0.5, 3*s, 11*s);
+  ctx.fillStyle = '#f4c9a0';
+  ctx.fillRect(sx - 8*scale, sy - 21*scale, 2*scale, 9*scale);
+  ctx.fillRect(sx + 6*scale, sy - 21*scale, 2*scale, 9*scale);
   // Tête
-  ctx.fillStyle = '#e8b894';
-  ctx.beginPath(); ctx.arc(sx, sy - 12*s, 6*s, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
-  // Yeux
-  ctx.fillStyle = '#000';
-  ctx.fillRect(sx - 3*s, sy - 13*s, 1.5*s, 1.5*s);
-  ctx.fillRect(sx + 1.5*s, sy - 13*s, 1.5*s, 1.5*s);
+  ctx.beginPath(); ctx.arc(sx, sy - 29*scale, 5*scale, 0, Math.PI*2); ctx.fill();
   // Cheveux
   ctx.fillStyle = '#3a2010';
-  ctx.beginPath(); ctx.arc(sx, sy - 15*s, 6*s, Math.PI, Math.PI*2); ctx.fill();
-  if (selected) {
-    ctx.strokeStyle = '#ffff00'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(sx, sy, 20*s, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(sx, sy - 31*scale, 5*scale, Math.PI, 0); ctx.fill();
+  // Yeux
+  ctx.fillStyle = '#000';
+  ctx.fillRect(sx - 2*scale, sy - 29*scale, 1, 1);
+  ctx.fillRect(sx + 1*scale, sy - 29*scale, 1, 1);
+  if (c.sick > 0) {
+    ctx.fillStyle = 'rgba(60,180,75,0.4)';
+    ctx.beginPath(); ctx.arc(sx, sy - 29*scale, 5*scale, 0, Math.PI*2); ctx.fill();
   }
-  // Barres
-  const bw = 22*s;
-  ctx.fillStyle = '#000'; ctx.fillRect(sx - bw/2 - 1, sy - 26*s - 1, bw + 2, 4);
-  ctx.fillStyle = '#e04040'; ctx.fillRect(sx - bw/2, sy - 26*s, bw * (c.hp/c.maxHp), 2);
-  ctx.fillStyle = '#e0a040'; ctx.fillRect(sx - bw/2, sy - 24*s, bw * (c.hunger/100), 2);
-  if (c.isChild) { ctx.fillStyle = '#fff'; ctx.font = `${10*s}px sans-serif`; ctx.textAlign = 'center'; ctx.fillText('enfant', sx, sy + 28*s); }
+  if (selected) {
+    const t = performance.now() * 0.004;
+    ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(sx, sy + 2, 12 + Math.sin(t), 4 + Math.sin(t)*0.5, 0, 0, Math.PI*2); ctx.stroke();
+  }
+  // Barres stats (4 fines)
+  const bx = sx - 14, by = sy - (48*scale), bw = 28;
+  const drawBar = (y, val, max, color) => {
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(bx, y, bw, 2);
+    ctx.fillStyle = color; ctx.fillRect(bx, y, bw * Math.max(0, val/max), 2);
+  };
+  drawBar(by,     c.hp,     c.maxHp, c.hp > 50 ? '#2ecc71' : c.hp > 25 ? '#f39c12' : '#e74c3c');
+  drawBar(by + 3, c.hunger, 100,     '#e67e22');
+  drawBar(by + 6, c.thirst, 100,     '#3498db');
+  drawBar(by + 9, c.warmth, 100,     '#e84393');
+  if (c.isChild) {
+    ctx.fillStyle = '#9b59b6'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('enfant', sx, sy - 52);
+    ctx.textAlign = 'start';
+  }
 }
 
 export function drawAnimal(ctx, a, sx, sy) {

@@ -1,5 +1,5 @@
 // entities.js - Colons, animaux, bandits, villages, bâtiments
-import { canWalk, findWalkableSpawn } from './world.js';
+import { canWalk, findWalkableSpawn, getBiomeAt } from './world.js';
 
 let _id = 0;
 const nextId = () => ++_id;
@@ -17,17 +17,19 @@ export class Colon {
     this.age = isChild ? 0 : 18; this.isChild = isChild;
     this.sick = 0; this.attackCd = 0; this.walkPhase = 0; this.dog = null;
   }
-  speed() {
+  baseSpeed() {
     if (this.energy < 15 || this.isChild) return 50;
     if (this.mood > 70) return 100;
     return 90;
   }
   update(dt, world) {
+    const biome = getBiomeAt(world, this.x, this.y);
+    const sp = this.baseSpeed() * biome.speedMult;
     const dx = this.targetX - this.x, dy = this.targetY - this.y;
     const d = Math.hypot(dx, dy);
-    if (d > 2) {
-      const sp = this.speed() * dt;
-      const nx = this.x + (dx/d)*sp, ny = this.y + (dy/d)*sp;
+    if (d > 2 && sp > 0) {
+      const step = sp * dt;
+      const nx = this.x + (dx/d)*step, ny = this.y + (dy/d)*step;
       if (canWalk(world, nx, ny)) { this.x = nx; this.y = ny; }
       else if (canWalk(world, nx, this.y)) this.x = nx;
       else if (canWalk(world, this.x, ny)) this.y = ny;
@@ -36,6 +38,8 @@ export class Colon {
     this.hunger = Math.max(0, this.hunger - dt*0.5);
     this.thirst = Math.max(0, this.thirst - dt*0.7);
     this.energy = Math.max(0, this.energy - dt*0.3);
+    // Biome warmth effect
+    this.warmth = Math.max(0, Math.min(100, this.warmth + biome.warmthDelta*dt*10));
     if (this.hunger < 20) this.hp -= dt*1.2;
     if (this.thirst < 20) this.hp -= dt*1.5;
     if (this.warmth < 25) this.hp -= dt*0.8;
