@@ -125,7 +125,7 @@ function frame(now) {
   update(state, dt);
   // Draw
   clearCanvas(ctx);
-  drawTerrain(ctx, state.camera);
+  drawTerrain(ctx, state.camera, state.world);
   // Sort entities by Y for fake 3D
   const drawables = [];
   const trees = state._nearTrees || [];
@@ -135,7 +135,6 @@ function frame(now) {
   for (const r of rocks) drawables.push({ y: r.y, fn: () => drawRock(ctx, r.x - state.camera.x, r.y - state.camera.y, r.level) });
   for (const a of animals) drawables.push({ y: a.y, fn: () => drawAnimal(ctx, a, a.x - state.camera.x, a.y - state.camera.y) });
   for (const b of state.buildings) drawables.push({ y: b.y, fn: () => drawBuilding(ctx, b, b.x - state.camera.x, b.y - state.camera.y, b.anim) });
-  for (const a of state.animals) drawables.push({ y: a.y, fn: () => drawAnimal(ctx, a, a.x - state.camera.x, a.y - state.camera.y) });
   for (const b of state.bandits) drawables.push({ y: b.y, fn: () => drawBandit(ctx, b, b.x - state.camera.x, b.y - state.camera.y) });
   for (const c of state.colons) drawables.push({ y: c.y, fn: () => drawColon(ctx, c, c.x - state.camera.x, c.y - state.camera.y, c === state.selected) });
   drawables.sort((a, b) => a.y - b.y);

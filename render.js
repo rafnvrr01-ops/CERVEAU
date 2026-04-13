@@ -1,57 +1,35 @@
-// render.js - Rendu Canvas2D (partie 1: terrain, minimap, ghost)
-import { CONFIG, BIOMES } from './world.js';
+// render.js - Rendu Canvas2D sans cache offscreen (dessin tuile par tuile visible)
+import { CONFIG, BIOMES, BIOME_LIST, getTile } from './world.js';
 import { BUILDINGS } from './entities.js';
 
-const BIOME_COLORS = Object.values(BIOMES).map(b => b.color);
-
-let terrainCache = null; // offscreen full-world canvas
-let minimapTerrainCache = null;
+const BIOME_COLORS = BIOME_LIST.map(b => b.color);
 
 export function initRenderer(world) {
-  // Terrain cache: 1px par tuile pour économie mémoire, scaled au draw
-  const W = world.W, H = world.H;
-  terrainCache = document.createElement('canvas');
-  terrainCache.width = W * CONFIG.TILE;
-  terrainCache.height = H * CONFIG.TILE;
-  const tctx = terrainCache.getContext('2d');
-  // Draw chaque tuile
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      tctx.fillStyle = BIOME_COLORS[world.tiles[y*W + x]];
-      tctx.fillRect(x*CONFIG.TILE, y*CONFIG.TILE, CONFIG.TILE, CONFIG.TILE);
-    }
-  }
-  // Minimap cache (Bug 4: pre-render terrain en 130x130)
-  minimapTerrainCache = document.createElement('canvas');
-  minimapTerrainCache.width = 130; minimapTerrainCache.height = 130;
-  const mctx = minimapTerrainCache.getContext('2d');
-  const sx = 130 / W, sy = 130 / H;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      mctx.fillStyle = BIOME_COLORS[world.tiles[y*W + x]];
-      mctx.fillRect(x*sx, y*sy, sx + 1, sy + 1);
-    }
-  }
+  // No offscreen cache: tiles read via getTile on the fly.
+  // world.js internal LRU (50000 entries) guarantees perf.
 }
 
-export function drawTerrain(ctx, camera) {
-  // Blit la portion visible du cache offscreen
+export function drawTerrain(ctx, camera, world) {
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(
-    terrainCache,
-    camera.x, camera.y, CONFIG.CANVAS_W, CONFIG.CANVAS_H,
-    0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H
-  );
+  const T = CONFIG.TILE;
+  const tx0 = Math.max(0, Math.floor(camera.x / T));
+  const ty0 = Math.max(0, Math.floor(camera.y / T));
+  const tx1 = Math.min(world.W, Math.ceil((camera.x + CONFIG.CANVAS_W) / T));
+  const ty1 = Math.min(world.H, Math.ceil((camera.y + CONFIG.CANVAS_H) / T));
+  for (let ty = ty0; ty < ty1; ty++) {
+    for (let tx = tx0; tx < tx1; tx++) {
+      ctx.fillStyle = BIOME_COLORS[getTile(world, tx, ty)];
+      ctx.fillRect(tx * T - camera.x, ty * T - camera.y, T + 1, T + 1);
+    }
+  }
 }
 
 export function drawNightOverlay(ctx, timeOfDay) {
-  // timeOfDay 0..1 (0.25 = 6h, 0.75 = 18h)
   let alpha = 0;
   if (timeOfDay < 0.20 || timeOfDay > 0.85) alpha = 0.5;
   else if (timeOfDay < 0.30) alpha = (0.30 - timeOfDay) * 5;
   else if (timeOfDay > 0.75) alpha = (timeOfDay - 0.75) * 5;
   if (alpha > 0) {
-    // Teinte orangée à l'aube/crépuscule
     const orange = (timeOfDay < 0.30 || timeOfDay > 0.75) && alpha < 0.4;
     ctx.fillStyle = orange ? `rgba(80, 40, 20, ${alpha})` : `rgba(10, 10, 40, ${alpha})`;
     ctx.fillRect(0, 0, CONFIG.CANVAS_W, CONFIG.CANVAS_H);
@@ -80,30 +58,39 @@ export function drawSnow(ctx, t) {
 }
 
 export function drawMinimap(mctx, state) {
-  // Re-blit cache + entités dynamiques (Bug 4)
-  mctx.drawImage(minimapTerrainCache, 0, 0);
-  const sx = 130 / state.world.W / CONFIG.TILE;
-  const sy = 130 / state.world.H / CONFIG.TILE;
-  // Bâtiments
-  mctx.fillStyle = '#8b4513';
-  for (const b of state.buildings) mctx.fillRect(b.x*sx - 1, b.y*sy - 1, 2, 2);
-  // Villages
-  for (const v of state.villages) {
-    mctx.fillStyle = v.color;
-    mctx.fillRect(v.x*sx - 2, v.y*sy - 2, 4, 4);
+  const MM = 130;
+  mctx.fillStyle = '#1a1a2a'; mctx.fillRect(0, 0, MM, MM);
+  const centerX = state.selected ? state.selected.x : CONFIG.WORLD_W/2;
+  const centerY = state.selected ? state.selected.y : CONFIG.WORLD_H/2;
+  const viewW = 3000, viewH = 3000;
+  const mx0 = centerX - viewW/2;
+  const my0 = centerY - viewH/2;
+  const tileStep = 3;
+  const tx0 = Math.floor(mx0 / CONFIG.TILE);
+  const ty0 = Math.floor(my0 / CONFIG.TILE);
+  const tilesVisible = Math.floor(viewW / CONFIG.TILE);
+  const pxPerTile = MM / tilesVisible;
+  for (let dy = 0; dy < tilesVisible; dy += tileStep) {
+    for (let dx = 0; dx < tilesVisible; dx += tileStep) {
+      const tx = tx0 + dx, ty = ty0 + dy;
+      if (tx < 0 || ty < 0 || tx >= state.world.W || ty >= state.world.H) continue;
+      mctx.fillStyle = BIOME_COLORS[getTile(state.world, tx, ty)];
+      mctx.fillRect(dx * pxPerTile, dy * pxPerTile, pxPerTile * tileStep + 1, pxPerTile * tileStep + 1);
+    }
   }
-  // Colons
+  const toMM = (x, y) => [(x - mx0) / viewW * MM, (y - my0) / viewH * MM];
+  mctx.fillStyle = '#8b4513';
+  for (const b of state.buildings) { const [x,y] = toMM(b.x, b.y); mctx.fillRect(x-1, y-1, 3, 3); }
+  for (const v of state.villages) {
+    const [x,y] = toMM(v.x, v.y); mctx.fillStyle = v.color; mctx.fillRect(x-2, y-2, 4, 4);
+  }
   mctx.fillStyle = '#ffffff';
-  for (const c of state.colons) mctx.fillRect(c.x*sx - 1, c.y*sy - 1, 2, 2);
-  // Ennemis
+  for (const c of state.colons) { const [x,y] = toMM(c.x, c.y); mctx.fillRect(x-1, y-1, 3, 3); }
   mctx.fillStyle = '#ff3030';
-  for (const b of state.bandits) mctx.fillRect(b.x*sx - 1, b.y*sy - 1, 2, 2);
-  // Cadre caméra
+  for (const b of state.bandits) { const [x,y] = toMM(b.x, b.y); mctx.fillRect(x-1, y-1, 3, 3); }
   mctx.strokeStyle = '#ffff00'; mctx.lineWidth = 1;
-  mctx.strokeRect(
-    state.camera.x * sx, state.camera.y * sy,
-    CONFIG.CANVAS_W * sx, CONFIG.CANVAS_H * sy
-  );
+  const [cx, cy] = toMM(state.camera.x, state.camera.y);
+  mctx.strokeRect(cx, cy, CONFIG.CANVAS_W / viewW * MM, CONFIG.CANVAS_H / viewH * MM);
 }
 
 export function drawGhost(ctx, mouseWorldX, mouseWorldY, buildType, world, camera, resources, techs) {
@@ -111,27 +98,24 @@ export function drawGhost(ctx, mouseWorldX, mouseWorldY, buildType, world, camer
   const def = BUILDINGS[buildType]; if (!def) return;
   const sx = mouseWorldX - camera.x;
   const sy = mouseWorldY - camera.y;
-  // Validité: tech, ressources, tuile praticable
   let valid = true;
   if (def.tech && !techs[def.tech]) valid = false;
   for (const [k, v] of Object.entries(def.cost)) {
     if ((resources[k] || 0) < v) { valid = false; break; }
   }
-  // Vérifie tuile
   const tx = Math.floor(mouseWorldX / CONFIG.TILE);
   const ty = Math.floor(mouseWorldY / CONFIG.TILE);
-  const tileId = world.tiles[ty * world.W + tx];
-  const biome = Object.values(BIOMES).find(b => b.id === tileId);
+  const biome = BIOME_LIST[getTile(world, tx, ty)];
   if (!biome || !biome.walkable) valid = false;
-  // Rectangle 32x32 centré
   ctx.fillStyle = valid ? 'rgba(80,220,80,0.35)' : 'rgba(220,60,60,0.35)';
   ctx.strokeStyle = valid ? '#40c040' : '#c04040';
   ctx.lineWidth = 2;
-  ctx.fillRect(sx - 16, sy - 16, 32, 32);
-  ctx.strokeRect(sx - 16, sy - 16, 32, 32);
-  // Label
-  ctx.fillStyle = '#000'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(def.name, sx, sy + 30);
+  ctx.fillRect(sx - 20, sy - 20, 40, 40);
+  ctx.strokeRect(sx - 20, sy - 20, 40, 40);
+  ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+  ctx.strokeText(def.name, sx, sy + 36);
+  ctx.fillText(def.name, sx, sy + 36);
 }
 
 export function clearCanvas(ctx) {
