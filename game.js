@@ -104,6 +104,15 @@ export function createGameState(seed) {
       gold100: false, allTechs: false, age20: false,
     },
   };
+  // Spawn 6 villages in a ring around the starting colon
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2;
+    const r = 1500 + Math.random() * 1000;
+    const x = colon.x + Math.cos(angle) * r;
+    const y = colon.y + Math.sin(angle) * r;
+    state.villages.push(new Village(x, y, VILLAGE_NAMES[i], VILLAGE_COLORS[i]));
+  }
+  return state;
 }
 
 export function update(state, rawDt) {
