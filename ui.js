@@ -52,14 +52,12 @@ export function setSelectedAction(action) {
 }
 
 function renderPanel() {
-  // Hide all panels first
   ['actions','resources','buildings','tech','colony'].forEach(p => {
     const el = document.getElementById('panel-' + p);
-    if (el) el.style.display = 'none';
+    if (el) el.classList.toggle('active', p === _currentTab);
   });
   const active = document.getElementById('panel-' + _currentTab);
   if (!active) return;
-  active.style.display = 'flex';
   active.innerHTML = '';
   if (_currentTab === 'actions') renderActions(active);
   else if (_currentTab === 'resources') renderResources(active);
@@ -72,7 +70,6 @@ function makeBtn(label, onClick, active = false) {
   const b = document.createElement('button');
   b.textContent = label;
   b.className = 'act-btn' + (active ? ' active' : '');
-  b.style.cssText = 'background:transparent;border:0.5px solid var(--color-border-secondary);padding:5px 9px;border-radius:5px;font-size:11px;cursor:pointer;margin:2px;';
   b.addEventListener('click', onClick);
   return b;
 }

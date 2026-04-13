@@ -11,7 +11,9 @@ const minimap = document.getElementById('minimap');
 const mctx = minimap.getContext('2d');
 
 function resizeCanvas() {
-  updateCanvasSize();
+  const rect = canvas.getBoundingClientRect();
+  CONFIG.CANVAS_W = Math.floor(rect.width);
+  CONFIG.CANVAS_H = Math.floor(rect.height);
   canvas.width = CONFIG.CANVAS_W;
   canvas.height = CONFIG.CANVAS_H;
 }

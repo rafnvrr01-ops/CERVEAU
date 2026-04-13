@@ -243,39 +243,41 @@ export function drawSnow(ctx, t) {
 }
 
 export function drawMinimap(mctx, state) {
-  const MM = 130;
-  mctx.fillStyle = '#1a1a2a'; mctx.fillRect(0, 0, MM, MM);
+  const MM_W = 240, MM_H = 160;
+  mctx.fillStyle = '#0a0d14'; mctx.fillRect(0, 0, MM_W, MM_H);
   const centerX = state.selected ? state.selected.x : CONFIG.WORLD_W/2;
   const centerY = state.selected ? state.selected.y : CONFIG.WORLD_H/2;
-  const viewW = 3000, viewH = 3000;
+  const viewW = 4500, viewH = 3000;
   const mx0 = centerX - viewW/2;
   const my0 = centerY - viewH/2;
   const tileStep = 3;
   const tx0 = Math.floor(mx0 / CONFIG.TILE);
   const ty0 = Math.floor(my0 / CONFIG.TILE);
-  const tilesVisible = Math.floor(viewW / CONFIG.TILE);
-  const pxPerTile = MM / tilesVisible;
-  for (let dy = 0; dy < tilesVisible; dy += tileStep) {
-    for (let dx = 0; dx < tilesVisible; dx += tileStep) {
+  const tilesW = Math.floor(viewW / CONFIG.TILE);
+  const tilesH = Math.floor(viewH / CONFIG.TILE);
+  const pxW = MM_W / tilesW;
+  const pxH = MM_H / tilesH;
+  for (let dy = 0; dy < tilesH; dy += tileStep) {
+    for (let dx = 0; dx < tilesW; dx += tileStep) {
       const tx = tx0 + dx, ty = ty0 + dy;
       if (tx < 0 || ty < 0 || tx >= state.world.W || ty >= state.world.H) continue;
       mctx.fillStyle = BIOME_COLORS[getTile(state.world, tx, ty)];
-      mctx.fillRect(dx * pxPerTile, dy * pxPerTile, pxPerTile * tileStep + 1, pxPerTile * tileStep + 1);
+      mctx.fillRect(dx * pxW, dy * pxH, pxW * tileStep + 1, pxH * tileStep + 1);
     }
   }
-  const toMM = (x, y) => [(x - mx0) / viewW * MM, (y - my0) / viewH * MM];
+  const toMM = (x, y) => [(x - mx0) / viewW * MM_W, (y - my0) / viewH * MM_H];
   mctx.fillStyle = '#8b4513';
   for (const b of state.buildings) { const [x,y] = toMM(b.x, b.y); mctx.fillRect(x-1, y-1, 3, 3); }
   for (const v of state.villages) {
     const [x,y] = toMM(v.x, v.y); mctx.fillStyle = v.color; mctx.fillRect(x-2, y-2, 4, 4);
   }
   mctx.fillStyle = '#ffffff';
-  for (const c of state.colons) { const [x,y] = toMM(c.x, c.y); mctx.fillRect(x-1, y-1, 3, 3); }
+  for (const c of state.colons) { const [x,y] = toMM(c.x, c.y); mctx.fillRect(x-2, y-2, 4, 4); }
   mctx.fillStyle = '#ff3030';
   for (const b of state.bandits) { const [x,y] = toMM(b.x, b.y); mctx.fillRect(x-1, y-1, 3, 3); }
-  mctx.strokeStyle = '#ffff00'; mctx.lineWidth = 1;
+  mctx.strokeStyle = '#fbbf24'; mctx.lineWidth = 1.5;
   const [cx, cy] = toMM(state.camera.x, state.camera.y);
-  mctx.strokeRect(cx, cy, CONFIG.CANVAS_W / viewW * MM, CONFIG.CANVAS_H / viewH * MM);
+  mctx.strokeRect(cx, cy, CONFIG.CANVAS_W / viewW * MM_W, CONFIG.CANVAS_H / viewH * MM_H);
 }
 
 export function drawGhost(ctx, mouseWorldX, mouseWorldY, buildType, world, camera, resources, techs) {
