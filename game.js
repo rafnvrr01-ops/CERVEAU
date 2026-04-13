@@ -74,47 +74,6 @@ export function createGameState(seed) {
   }
   return state;
 }
-  const colon = spawnColon(world, 'Aldred');
-  const state = {
-    world,
-    colons: [colon],
-    animals: [],
-    bandits: [],
-    villages: [],
-    buildings: [],
-    resources: { wood: 0, stone: 0, iron: 0, gold: 5, food: 10, water: 8, herbs: 2, seeds: 3 },
-    techs: {},
-    day: 1,
-    timeOfDay: 0.25,
-    season: 'Printemps',
-    seasonDay: 0,
-    weather: 'Clair',
-    weatherCd: 30,
-    speed: 1,
-    paused: false,
-    selected: colon,
-    selectedAction: 'move',
-    selectedBuildType: null,
-    camera: { x: colon.x - CONFIG.CANVAS_W/2, y: colon.y - CONFIG.CANVAS_H/2 },
-    mouseWorldX: 0, mouseWorldY: 0,
-    score: 0,
-    spawnCd: 5,
-    objectives: {
-      pop5: false, allBuildings: false, ally: false,
-      gold100: false, allTechs: false, age20: false,
-    },
-  };
-  // Spawn 6 villages in a ring around the starting colon
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2;
-    const r = 1500 + Math.random() * 1000;
-    const x = colon.x + Math.cos(angle) * r;
-    const y = colon.y + Math.sin(angle) * r;
-    state.villages.push(new Village(x, y, VILLAGE_NAMES[i], VILLAGE_COLORS[i]));
-  }
-  return state;
-}
-
 export function update(state, rawDt) {
   if (state.paused) return;
   const dt = Math.min(rawDt, 0.1) * state.speed;
