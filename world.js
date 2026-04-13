@@ -111,6 +111,32 @@ const DENSITY = {
 };
 
 // Generate entities for one chunk deterministically
+
+function makeAnimal(id, x, y, species) {
+  const hp = species === 'wolf' ? 30 : (species === 'deer' ? 40 : 50);
+  return {
+    id, kind: 'animal', species, x, y, hp, maxHp: hp,
+    tame: 0, tamed: false, hostile: species === 'wolf-black',
+    targetX: x, targetY: y, wanderCd: 0, attackCd: 0, owner: null,
+    update(dt, world) {
+      this.wanderCd -= dt;
+      if (this.wanderCd <= 0) {
+        this.wanderCd = 2 + Math.random()*3;
+        this.targetX = this.x + (Math.random()-0.5)*200;
+        this.targetY = this.y + (Math.random()-0.5)*200;
+      }
+      const dx = this.targetX - this.x, dy = this.targetY - this.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 2) {
+        const sp = 60 * dt;
+        const nx = this.x + (dx/d)*sp, ny = this.y + (dy/d)*sp;
+        if (canWalk(world, nx, ny)) { this.x = nx; this.y = ny; }
+      }
+      if (this.attackCd > 0) this.attackCd -= dt;
+    }
+  };
+}
+
 export function generateChunkEntities(world, cx, cy) {
   const out = { trees: [], rocks: [], animals: [] };
   for (let dy = 0; dy < CONFIG.CHUNK; dy++) {
@@ -129,11 +155,11 @@ export function generateChunkEntities(world, cx, cy) {
         const lvl = id === 7 ? Math.floor(hash2(tx,ty,world.seed+3)*5) : (id === 6 ? 1 : 0);
         out.rocks.push({ id: eid, x: wx, y: wy, level: lvl, hp: 40 });
       } else if (d.cow && r < (cum += d.cow)) {
-        out.animals.push({ id: eid, x: wx, y: wy, species: 'cow', hp: 50, maxHp: 50, tame: 0, tamed: false, hostile: false, targetX: wx, targetY: wy, wanderCd: 0, attackCd: 0 });
+        out.animals.push(makeAnimal(eid, wx, wy, 'cow'));
       } else if (d.deer && r < (cum += d.deer)) {
-        out.animals.push({ id: eid, x: wx, y: wy, species: 'deer', hp: 40, maxHp: 40, tame: 0, tamed: false, hostile: false, targetX: wx, targetY: wy, wanderCd: 0, attackCd: 0 });
+        out.animals.push(makeAnimal(eid, wx, wy, 'deer'));
       } else if (d.wolf && r < (cum += d.wolf)) {
-        out.animals.push({ id: eid, x: wx, y: wy, species: 'wolf', hp: 30, maxHp: 30, tame: 0, tamed: false, hostile: false, targetX: wx, targetY: wy, wanderCd: 0, attackCd: 0 });
+        out.animals.push(makeAnimal(eid, wx, wy, 'wolf'));
       }
     }
   }

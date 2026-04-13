@@ -136,7 +136,7 @@ export function update(state, rawDt) {
     else c.warmth = Math.min(100, c.warmth + dt * 0.2);
   }
   state.colons = state.colons.filter(c => c.hp > 0);
-  for (const a of state._nearAnimals) a.update(dt, state.world);
+  for (const a of (state._nearAnimals||[])) a.update(dt, state.world);
   for (const b of state.bandits) {
     const target = state.colons[0];
     b.update(dt, state.world, target);
