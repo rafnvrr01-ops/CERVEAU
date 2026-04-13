@@ -125,7 +125,7 @@ function frame(now) {
   update(state, dt);
   // Draw
   clearCanvas(ctx);
-  drawTerrain(ctx, state.camera, state.world);
+  drawTerrain(ctx, state.camera, state.world, now / 1000);
   // Sort entities by Y for fake 3D
   const drawables = [];
   const trees = state._nearTrees || [];
